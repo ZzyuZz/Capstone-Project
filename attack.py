@@ -1,7 +1,7 @@
 import torch
 import numpy as np
-from torch_geometric.utils import from_networkx, to_networkx
-import networkx as nx
+from torch_geometric.utils import to_networkx
+import torch.nn.functional as F
 
 # set random seed for reproducibility
 # torch.manual_seed(30)
@@ -13,10 +13,11 @@ class StructureAttack:
     def label_attack(data, attack_rate=0.3):
         G = to_networkx(data, to_undirected=True)  
         labels = data.y.numpy() 
-        num_nodes = len(labels)  
-        num_attack = int(attack_rate * num_nodes)  
+        train_mask = data.train_mask.numpy()  
+        num_train_nodes = train_mask.sum()  
+        num_attack = int(attack_rate * num_train_nodes)
         
-        attack_nodes = np.random.choice(num_nodes, num_attack, replace=False)
+        attack_nodes = np.random.choice(np.where(train_mask)[0], num_attack, replace=False)
         
         for node in attack_nodes:
             neighbors = list(G.neighbors(node))  
@@ -63,44 +64,29 @@ class StructureAttack:
 
         return data
 
-## Model Attack ##
-# Adversarial Attack 
-class Nettack:
-    def __init__(self, data, modification_budget=3):
+## Adversarial Attack ##
+class AdversarialAttack:
+    def __init__(self, model, data, epsilon=0.1):
+        self.model = model
         self.data = data
-        self.graph = to_networkx(self.data, to_undirected=True)
-        self.modification_budget = modification_budget
+        self.epsilon = epsilon
 
-    def adversarial_attack(self):
-        central_nodes = self.select_critical_nodes()
-        return self.apply_perturbations(central_nodes)
+    def attack(self):
+        self.model.eval()
+        data = self.data
+        
+        perturbed_data = data.clone() 
+        perturbed_data.x.requires_grad = True
 
-    # return taget nodes
-    def select_critical_nodes(self):
-        centrality = nx.degree_centrality(self.graph)
-        sorted_nodes = sorted(centrality.items(), key=lambda x: x[1], reverse=True)
-    
-        return [node for node, _ in sorted_nodes[:self.modification_budget]]
+        output = self.model(perturbed_data.x, perturbed_data.edge_index)
+        loss = F.nll_loss(output[data.train_mask], data.y[data.train_mask])
+        
+        self.model.zero_grad()
+        loss.backward()
 
-    # apply perturbations and return changed data
-    def apply_perturbations(self, nodes):
-        # for node in self.graph.nodes:
-        #     if node >= self.data.x.size(0):
-        #         print(f"Node {node} is missing features!")
-        #         continue
+        # FGSM attack
+        perturbation = self.epsilon * perturbed_data.x.grad.sign()
+        perturbed_data.x = perturbed_data.x.detach() + perturbation
+        perturbed_data.x = perturbed_data.x.clamp(0, 1) 
 
-        for node in nodes:
-            # 随机生成新的特征
-            new_feature = np.random.rand(self.data.x.size(1))
-            self.data.x[node] = torch.tensor(new_feature, dtype=torch.float)
-
-            # 随机移除一个邻居的边
-            neighbors = list(self.graph.neighbors(node))
-            if neighbors:
-                edge_to_remove = (node, np.random.choice(neighbors))
-                self.graph.remove_edge(*edge_to_remove)
-
-        modified_data = from_networkx(self.graph)
-
-        # 更新特征
-        modified_data.x = self.data.x
+        return perturbed_data

@@ -23,7 +23,7 @@ class GCN(torch.nn.Module):
         return x
 
 # Create GNN model
-model = GCN(dataset.num_features, 32, dataset.num_classes, dropout_rate=0.5)
+model = GCN(dataset.num_features, 16, dataset.num_classes, dropout_rate=0.2)
 
 # Get data
 data = dataset[0]
@@ -33,7 +33,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)  # Learning rate scheduler
 
 # Train model function
-def train_model(model, data, optimizer, scheduler, epochs=200):
+def train_model(model, data, optimizer, scheduler, epochs=300):
     losses = []
     accuracies = []
     for epoch in range(epochs):
