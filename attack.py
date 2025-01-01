@@ -11,7 +11,6 @@ import torch.nn.functional as F
 # label attack in Core dataset. Randomly convert 30% of labels
 class StructureAttack:
     def label_attack(data, attack_rate=0.3):
-        G = to_networkx(data, to_undirected=True)  
         labels = data.y.numpy() 
         train_mask = data.train_mask.numpy()  
         num_train_nodes = train_mask.sum()  
@@ -20,16 +19,10 @@ class StructureAttack:
         attack_nodes = np.random.choice(np.where(train_mask)[0], num_attack, replace=False)
         
         for node in attack_nodes:
-            neighbors = list(G.neighbors(node))  
-            if neighbors: 
-                current_label = labels[node]
-                possible_labels = [label for label in labels[neighbors] if label != current_label]
-                
-                if possible_labels:  
-                    new_label = np.random.choice(possible_labels) 
-                    # print(f'Node {node} label changed from {current_label} to {new_label}')  
-                    labels[node] = new_label  
-        
+            current_label = labels[node]
+            new_label = np.random.choice([label for label in range(7) if label != current_label])
+            labels[node] = new_label
+
         data.y = torch.tensor(labels)  
         return data  
 
@@ -71,7 +64,7 @@ class AdversarialAttack:
         self.data = data
         self.epsilon = epsilon
 
-    def attack(self):
+    def FGSMattack(self):
         self.model.eval()
         data = self.data
         

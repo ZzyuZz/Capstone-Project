@@ -110,7 +110,7 @@ print(f'After edge attack F1 score: {f1score:.4f}')
 #  Adversarial attack test - FGSM
 reset()
 attacker = AdversarialAttack(model, data)
-attck_data = attacker.attack()
+attck_data = attacker.FGSMattack()
 train_model(model, attck_data, optimizer, scheduler)
 accuracy = test_model_accuracy(model, data)
 print(f'After adversarial attack Accuracy: {accuracy:.4f}')
