@@ -41,10 +41,11 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
 
 # reset model, optimizer and learning rate scheduler function
 def reset():
-    data = dataset[0]
     model = GCN(dataset.num_features, 32, dataset.num_classes)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
+
+    return model, optimizer, scheduler
 
 # train model function
 def train_model(model, data, optimizer, scheduler, epochs=300):
@@ -91,7 +92,7 @@ print(f'F1 score: {f1score:.4f}')
 
 # label attack test
 attck_data = StructureAttack.label_attack(data)
-reset()
+model, optimizer, scheduler = reset() 
 train_model(model, attck_data, optimizer, scheduler)
 accuracy = test_model_accuracy(model, data)
 print(f'After label attack Accuracy: {accuracy:.4f}')
@@ -100,7 +101,7 @@ print(f'After label attack F1 score: {f1score:.4f}')
 
 # edge attack test
 attck_data = StructureAttack.edge_attack(data)
-reset()
+model, optimizer, scheduler = reset() 
 train_model(model, attck_data, optimizer, scheduler)
 accuracy = test_model_accuracy(model, data)
 print(f'After edge attack Accuracy: {accuracy:.4f}')
@@ -108,7 +109,7 @@ f1score = test_model_f1_score(model, data)
 print(f'After edge attack F1 score: {f1score:.4f}')
 
 #  Adversarial attack test - FGSM
-reset()
+model, optimizer, scheduler = reset() 
 attacker = AdversarialAttack(model, data)
 attck_data = attacker.FGSMattack()
 train_model(model, attck_data, optimizer, scheduler)

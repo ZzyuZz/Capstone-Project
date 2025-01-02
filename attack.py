@@ -8,8 +8,8 @@ import torch.nn.functional as F
 # np.random.seed(30)
 
 ## Structure Attack ##
-# label attack in Core dataset. Randomly convert 30% of labels
 class StructureAttack:
+    # label attack in Core dataset. Randomly convert 30% of labels
     def label_attack(data, attack_rate=0.3):
         labels = data.y.numpy() 
         train_mask = data.train_mask.numpy()  
