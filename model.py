@@ -1,11 +1,11 @@
 import torch
 from torch import Tensor
 from torch_geometric.nn import GCNConv, GATConv
-from torch_geometric.datasets import Planetoid
+from torch_geometric.datasets import Planetoid, Reddit
 from sklearn.metrics import f1_score
 import torch.nn.functional as F
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
+from attack import StructureAttack, AdversarialAttack
 
 # Check if GPU is available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -45,9 +45,10 @@ class GAT(torch.nn.Module):
         x = self.convs[2](x, edge_index)
         return F.log_softmax(x, dim=1) 
 
-# Load Cora dataset
+# Load Cora or Citeseer dataset
 def load_data():
-    dataset = Planetoid(root='Cora', name='Cora')
+    dataset = Planetoid(root='./data/Cora', name='Cora')
+    # dataset = Reddit(root='./data/Reddit')
     data = dataset[0].to(device)
 
     original_train_labels = data.y[data.train_mask].cpu().numpy()
@@ -76,7 +77,7 @@ def train_model(model, data, optimizer, scheduler, epochs=300):
     for epoch in range(epochs):
         model.train()
         pred = model(data.x, data.edge_index)
-        loss = F.cross_entropy(pred[data.train_mask], data.y[data.train_mask])
+        loss = F.nll_loss(pred[data.train_mask], data.y[data.train_mask])
 
         optimizer.zero_grad()
         loss.backward()
@@ -106,31 +107,19 @@ def test_model_f1_score(model, data):
     f1 = f1_score(true_labels, predicted_labels, average='macro')
     return f1
 
-## Detector ##
-# Detect label attack
-def detect_label_attack(attacked_data, expected_dist, tolerance=0.01):
-    attacked_train_labels = attacked_data.y[attacked_data.train_mask].cpu().numpy()
-    unique, counts = np.unique(attacked_train_labels, return_counts=True)
+def adversarial_train(model, data, optimizer, scheduler, epochs=300):
+    model.train()
 
-    attacked_dist = np.zeros_like(expected_dist)
-    attacked_dist[unique] = counts / counts.sum()
-    
-    deviation = np.abs(attacked_dist - expected_dist)
-    max_deviation = deviation.max()
-    
-    if max_deviation > tolerance:
-        print(f"Label attack detected! Maximum deviation: {max_deviation:.2f}")
-        return True
-    return False
+    for epoch in range(epochs):
+        output_clean = model(data.x, data.edge_index)
+        loss_clean = F.nll_loss(output_clean[data.train_mask], data.y[data.train_mask])
 
-# Detect edge attack
-def detect_edge_attack(original_data, attacked_data, tolerance=0.01):
-    original_set = set(map(tuple, original_data.edge_index.t().tolist()))
-    attacked_set = set(map(tuple, attacked_data.edge_index.t().tolist()))
-
-    intersection = original_set.intersection(attacked_set)
-    union = original_set.union(attacked_set)
-    if 1.0 - len(intersection) / len(union)  > tolerance:
-        print(f"Edge attack detected! Change ratio: {1 - len(intersection)/len(union):.2f}")
-        return True
-    return False
+        perturbed_data = AdversarialAttack(model, data).FGSMattack(0.1).to(device)
+        output_adv = model(perturbed_data.x, perturbed_data.edge_index).to(device)
+        loss_adv = F.nll_loss(output_adv[data.train_mask], data.y[data.train_mask])
+        
+        total_loss = loss_clean + 0.5 * loss_adv
+        optimizer.zero_grad()
+        total_loss.backward()
+        optimizer.step()
+        scheduler.step()

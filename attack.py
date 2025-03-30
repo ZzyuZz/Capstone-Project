@@ -15,12 +15,14 @@ class StructureAttack:
         train_mask = data.train_mask.cpu().numpy()
         num_train_nodes = train_mask.sum()
         num_attack = int(attack_rate * num_train_nodes)
+        unique_labels = np.unique(labels)
+        num_classes = len(unique_labels)
 
         attack_nodes = np.random.choice(np.where(train_mask)[0], num_attack, replace=False)
 
         for node in attack_nodes:
             current_label = labels[node]
-            new_label = np.random.choice([label for label in range(7) if label != current_label])
+            new_label = np.random.choice([label for label in range(num_classes) if label != current_label])
             labels[node] = new_label
 
         data.y = torch.tensor(labels).to(device)  
@@ -62,7 +64,7 @@ class AdversarialAttack:
         self.data = data
         self.epsilon = epsilon
 
-    def FGSMattack(self):
+    def FGSMattack(self, epsilon=0.1):
         self.model.eval()
         data = self.data
 

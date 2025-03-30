@@ -1,6 +1,7 @@
 import argparse
-from model import load_data, reset_model, train_model, test_model_accuracy, test_model_f1_score, detect_label_attack, detect_edge_attack
+from model import load_data, reset_model, train_model, test_model_accuracy, test_model_f1_score, adversarial_train
 from attack import StructureAttack, AdversarialAttack
+from defend import detect_label_attack, detect_edge_attack
 
 
 def run_test(model_type, attack_type=None):
@@ -19,12 +20,15 @@ def run_test(model_type, attack_type=None):
             data = attacker.FGSMattack()
 
     if detect_label_attack(data, expected_dist):
-        return "Program Stop"
+        return "Label attack detected !"
     elif detect_edge_attack(original_data, data):
-        return "Program Stop"
+        return "Edge attack detected !"
     
-    # train and test data
+    # train by dector and adversarial train, 
+    adversarial_train(model, original_data, optimizer, scheduler)
+    model1, optimizer, scheduler = reset_model(model_type, num_features, num_classes)
     train_model(model, data, optimizer, scheduler)
+    # test
     accuracy = test_model_accuracy(model, original_data)
     f1score = test_model_f1_score(model, original_data)
     
