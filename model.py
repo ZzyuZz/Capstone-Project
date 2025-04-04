@@ -1,7 +1,7 @@
 import torch
 from torch import Tensor
 from torch_geometric.nn import GCNConv, GATConv
-from torch_geometric.datasets import Planetoid, Reddit
+from torch_geometric.datasets import Planetoid
 from sklearn.metrics import f1_score
 import torch.nn.functional as F
 import numpy as np
@@ -10,7 +10,7 @@ from attack import StructureAttack, AdversarialAttack
 # Check if GPU is available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# GCN model definition
+# GCN model definition(3 laayer)
 class GCN(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, dropout_rate=0.2):
         super().__init__()
@@ -27,7 +27,7 @@ class GCN(torch.nn.Module):
         x = self.convs[-1](x, edge_index)
         return F.log_softmax(x, dim=1) 
 
-# GAT model definition
+# GAT model definition(3 laayer)
 class GAT(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, heads=8, dropout_rate=0.2):
         super().__init__()
@@ -46,9 +46,8 @@ class GAT(torch.nn.Module):
         return F.log_softmax(x, dim=1) 
 
 # Load Cora or Citeseer dataset
-def load_data():
-    dataset = Planetoid(root='./data/Cora', name='Cora')
-    # dataset = Reddit(root='./data/Reddit')
+def load_data(name = 'Cora'):
+    dataset = Planetoid(root='./data/'+ name, name=name)
     data = dataset[0].to(device)
 
     original_train_labels = data.y[data.train_mask].cpu().numpy()
@@ -61,9 +60,9 @@ def load_data():
 # Reset model, optimizer, and learning rate scheduler
 def reset_model(model_name, num_features, num_classes):
     if model_name == 'GCN':
-        model = GCN(num_features, 16, num_classes)
+        model = GCN(num_features, 32, num_classes)
     elif model_name == 'GAT':
-        model = GAT(num_features, 16, num_classes)
+        model = GAT(num_features, 32, num_classes)
     else:
         raise ValueError(f"Unsupported model: {model_name}")
     
@@ -73,16 +72,33 @@ def reset_model(model_name, num_features, num_classes):
     return model, optimizer, scheduler
 
 # Train model
-def train_model(model, data, optimizer, scheduler, epochs=300):
+def train_model(model, data, optimizer, scheduler, epochs=300, patience=10):
+    best_val_loss = float('inf')
+    patience_counter = 0
+
     for epoch in range(epochs):
         model.train()
         pred = model(data.x, data.edge_index)
         loss = F.nll_loss(pred[data.train_mask], data.y[data.train_mask])
-
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         scheduler.step()
+
+        model.eval()
+        with torch.no_grad():
+            val_pred = model(data.x, data.edge_index)
+            val_loss = F.nll_loss(val_pred[data.val_mask], data.y[data.val_mask])
+
+        # Check loss > privious loss. If happen 10 times, break training
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            patience_counter = 0
+        else:
+            patience_counter += 1
+
+        if patience_counter >= patience:
+            break
 
 # Test model accuracy
 def test_model_accuracy(model, data):
@@ -114,7 +130,7 @@ def adversarial_train(model, data, optimizer, scheduler, epochs=300):
         output_clean = model(data.x, data.edge_index)
         loss_clean = F.nll_loss(output_clean[data.train_mask], data.y[data.train_mask])
 
-        perturbed_data = AdversarialAttack(model, data).FGSMattack(0.1).to(device)
+        perturbed_data = AdversarialAttack(model, data).FGSMattack().to(device)
         output_adv = model(perturbed_data.x, perturbed_data.edge_index).to(device)
         loss_adv = F.nll_loss(output_adv[data.train_mask], data.y[data.train_mask])
         

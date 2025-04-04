@@ -39,7 +39,7 @@ def train_model(model, data, optimizer, scheduler, epochs=300):
     for epoch in range(epochs):
         model.train()
         pred = model(data.x, data.edge_index)
-        loss = F.cross_entropy(pred[data.train_mask], data.y[data.train_mask])
+        loss =  F.nll_loss(pred[data.train_mask], data.y[data.train_mask])
         
         optimizer.zero_grad()
         loss.backward()
