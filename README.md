@@ -12,4 +12,29 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-## Run main program gnn_core.py
+## Run
+<hr>
+### Attak Test
+```
+python attack_test.py 
+```
+You can add the following instructions to command:<br>
+--model : to select model GCN or GAT (default: GCN)<br>
+--attack : to select the attack type to test (label, edge, fgsm, keyNodeAttack, all, or none)<br>
+--data : to select the dataset (Cora, CiteSeer, PubMed)<br>
+<br>
+### Attak Test by Detector
+```
+python attack_by_detector.py 
+```
+You can add the following instructions to command:<br>
+--model : to select model GCN or GAT (default: GCN)<br>
+--attack : to select the attack type to test (label, edge, fgsm, keyNodeAttack, all, or none)<br>
+--data : to select the dataset (Cora, CiteSeer, PubMed)<br>
+<br>
+### Model Rendered Image
+```
+python model_rendering.py 
+```
+You can add the following instructions to command:<br>
+--model : to select model GCN or GAT (default: GCN)<br>
