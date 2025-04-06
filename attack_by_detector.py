@@ -1,14 +1,14 @@
 import argparse
 import torch
-from model import load_data, reset_model, train_model, test_model_accuracy, test_model_f1_score, adversarial_train
+from model import load_data, reset_model, train_model, test_model_accuracy, test_model_f1_score, adversarial_train, limit_train_model
 from attack import StructureAttack, AdversarialAttack, FeatureAdversarialAttack
-from defend import detect_label_attack, detect_edge_attack
+from detector import detect_label_attack, detect_edge_attack
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def run_test(model_type, dataset='Cora', attack_type=None):
-    data, num_features, num_classes, expected_dist = load_data(dataset)
-    original_data = data
+    data, num_features, num_classes, expected_dist, edge_index = load_data(dataset)
+    original_data = data.clone()
     model, optimizer, scheduler = reset_model(model_type, num_features, num_classes)
     
     # Attack type select
@@ -26,13 +26,13 @@ def run_test(model_type, dataset='Cora', attack_type=None):
 
     if detect_label_attack(data, expected_dist):
         return "Label attack detected !"
-    elif detect_edge_attack(original_data, data):
+    elif detect_edge_attack(edge_index, data):
         return "Edge attack detected !"
     
     # train by dector and adversarial train, 
     adversarial_train(model, original_data, optimizer, scheduler)
-    model1, optimizer, scheduler = reset_model(model_type, num_features, num_classes)
-    train_model(model, data, optimizer, scheduler)
+    _, optimizer, scheduler = reset_model(model_type, num_features, num_classes)
+    limit_train_model(model, data, optimizer, scheduler)
     # test
     accuracy = test_model_accuracy(model, original_data)
     f1score = test_model_f1_score(model, original_data)

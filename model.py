@@ -55,7 +55,7 @@ def load_data(name = 'Cora'):
     original_dist = np.zeros(dataset.num_classes)
     original_dist[original_unique] = original_counts / original_counts.sum()
 
-    return data, dataset.num_features, dataset.num_classes, original_dist
+    return data, dataset.num_features, dataset.num_classes, original_dist, data.edge_index
 
 # Reset model, optimizer, and learning rate scheduler
 def reset_model(model_name, num_features, num_classes):
@@ -72,7 +72,59 @@ def reset_model(model_name, num_features, num_classes):
     return model, optimizer, scheduler
 
 # Train model
-def train_model(model, data, optimizer, scheduler, epochs=300, patience=10):
+def train_model(model, data, optimizer, scheduler, epochs=300):
+    for epoch in range(epochs):
+        model.train()
+        pred = model(data.x, data.edge_index)
+        loss = F.nll_loss(pred[data.train_mask], data.y[data.train_mask])
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        scheduler.step()
+
+# Test model accuracy
+def test_model_accuracy(model, data):
+    model.eval()
+    with torch.no_grad():
+        pred = model(data.x, data.edge_index)
+        _, pred_classes = pred.max(dim=1)
+        correct = (pred_classes[data.test_mask] == data.y[data.test_mask]).sum()
+        accuracy = int(correct) / int(data.test_mask.sum())
+    return accuracy
+
+
+# Test model F1 score
+def test_model_f1_score(model, data):
+    model.eval()
+    with torch.no_grad():
+        out = model(data.x, data.edge_index)
+        pred = out.argmax(dim=1)
+
+    true_labels = data.y[data.test_mask].cpu().numpy()
+    predicted_labels = pred[data.test_mask].cpu().numpy()
+    f1 = f1_score(true_labels, predicted_labels, average='macro')
+    return f1
+
+# Adding adversarial examples to the model
+def adversarial_train(model, data, optimizer, scheduler, epochs=300):
+    model.train()
+
+    for epoch in range(epochs):
+        output_clean = model(data.x, data.edge_index)
+        loss_clean = F.nll_loss(output_clean[data.train_mask], data.y[data.train_mask])
+
+        perturbed_data = AdversarialAttack(model, data).FGSMattack().to(device)
+        output_adv = model(perturbed_data.x, perturbed_data.edge_index).to(device)
+        loss_adv = F.nll_loss(output_adv[data.train_mask], data.y[data.train_mask])
+        
+        total_loss = loss_clean + 0.5 * loss_adv
+        optimizer.zero_grad()
+        total_loss.backward()
+        optimizer.step()
+        scheduler.step()
+
+# Add loss limit train
+def limit_train_model(model, data, optimizer, scheduler, epochs=300, patience=50):
     best_val_loss = float('inf')
     patience_counter = 0
 
@@ -99,43 +151,3 @@ def train_model(model, data, optimizer, scheduler, epochs=300, patience=10):
 
         if patience_counter >= patience:
             break
-
-# Test model accuracy
-def test_model_accuracy(model, data):
-    model.eval()
-    with torch.no_grad():
-        pred = model(data.x, data.edge_index)
-        _, pred_classes = pred.max(dim=1)
-        correct = (pred_classes[data.test_mask] == data.y[data.test_mask]).sum()
-        accuracy = int(correct) / int(data.test_mask.sum())
-    return accuracy
-
-
-# Test model F1 score
-def test_model_f1_score(model, data):
-    model.eval()
-    with torch.no_grad():
-        out = model(data.x, data.edge_index)
-        pred = out.argmax(dim=1)
-
-    true_labels = data.y[data.test_mask].cpu().numpy()
-    predicted_labels = pred[data.test_mask].cpu().numpy()
-    f1 = f1_score(true_labels, predicted_labels, average='macro')
-    return f1
-
-def adversarial_train(model, data, optimizer, scheduler, epochs=300):
-    model.train()
-
-    for epoch in range(epochs):
-        output_clean = model(data.x, data.edge_index)
-        loss_clean = F.nll_loss(output_clean[data.train_mask], data.y[data.train_mask])
-
-        perturbed_data = AdversarialAttack(model, data).FGSMattack().to(device)
-        output_adv = model(perturbed_data.x, perturbed_data.edge_index).to(device)
-        loss_adv = F.nll_loss(output_adv[data.train_mask], data.y[data.train_mask])
-        
-        total_loss = loss_clean + 0.5 * loss_adv
-        optimizer.zero_grad()
-        total_loss.backward()
-        optimizer.step()
-        scheduler.step()

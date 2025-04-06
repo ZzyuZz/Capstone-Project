@@ -54,9 +54,9 @@ class StructureAttack:
 
         new_edges = []
         attempts = 0
-        max_attempts = 2 * num_to_add  
+        max_attempts = num_to_add  
 
-        # Create new edge and check it a duplicate or not 
+        # check new edge is enough and check it a duplicate or not 
         while len(new_edges) < num_to_add and attempts < max_attempts:
             batch_size = min(1000, num_to_add - len(new_edges))
             src = torch.randint(0, num_nodes, (batch_size,), device=device)

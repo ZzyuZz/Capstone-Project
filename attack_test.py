@@ -6,8 +6,8 @@ from attack import StructureAttack, AdversarialAttack, FeatureAdversarialAttack
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def run_test(model_type, dataset='Cora', attack_type=None):
-    data, num_features, num_classes, expected_dist = load_data(dataset)
-    original_data = data
+    data, num_features, num_classes, _ , _ = load_data(dataset)
+    original_data = data.clone()
     model, optimizer, scheduler = reset_model(model_type, num_features, num_classes)
     
     # Attack type select
