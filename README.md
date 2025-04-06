@@ -14,10 +14,12 @@ pip install -r requirements.txt
 
 ## Run
 <hr>
+
 ### Attak Test
 ```
 python attack_test.py 
 ```
+
 You can add the following instructions to command:<br>
 --model : to select model GCN or GAT (default: GCN)<br>
 --attack : to select the attack type to test (label, edge, fgsm, keyNodeAttack, all, or none)<br>
@@ -27,6 +29,7 @@ You can add the following instructions to command:<br>
 ```
 python attack_by_detector.py 
 ```
+
 You can add the following instructions to command:<br>
 --model : to select model GCN or GAT (default: GCN)<br>
 --attack : to select the attack type to test (label, edge, fgsm, keyNodeAttack, all, or none)<br>
@@ -36,5 +39,6 @@ You can add the following instructions to command:<br>
 ```
 python model_rendering.py 
 ```
+
 You can add the following instructions to command:<br>
 --model : to select model GCN or GAT (default: GCN)<br>
