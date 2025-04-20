@@ -107,13 +107,11 @@ class AdversarialAttack:
         return perturbed_data
 
 class FeatureAdversarialAttack:
-    def __init__(self, model, data, topk_features=200, n_steps=5, step_size=0.1, eps=0.5):
+    def __init__(self, model, data, step_size=0.1):
         self.model = model.eval()
         self.data = data.clone()
-        self.topk_features = topk_features      
-        self.n_steps = n_steps                 
-        self.step_size = step_size              
-        self.eps = eps                         
+        self.topk_features = data.x.size(1)                  
+        self.step_size = step_size                                  
         self.original_x = data.x.detach().clone()  
 
     # find 30% important node and reture 
@@ -130,25 +128,22 @@ class FeatureAdversarialAttack:
         target_nodes = self._identify_critical_nodes()
         perturbed_x = self.original_x.clone()
         
-        for _ in range(self.n_steps):
-            perturbed_x = perturbed_x.detach().requires_grad_(True)
-            loss = F.nll_loss(
-                self.model(perturbed_x, self.data.edge_index)[target_nodes],
-                self.data.y[target_nodes]
-            )
-            grad = torch.autograd.grad(loss, perturbed_x, retain_graph=True)[0]
+      
+        perturbed_x = perturbed_x.detach().requires_grad_(True)
+        loss = F.nll_loss(
+            self.model(perturbed_x, self.data.edge_index)[target_nodes],
+            self.data.y[target_nodes]
+        )
+        grad = torch.autograd.grad(loss, perturbed_x, retain_graph=True)[0]
 
-            node_grad = grad[target_nodes].abs()
-            _, topk_indices = node_grad.topk(self.topk_features, dim=1)
-            
-            delta = torch.zeros_like(perturbed_x)
-            delta[target_nodes] = self.step_size * grad[target_nodes].sign()
-            delta[target_nodes] *= torch.zeros_like(delta[target_nodes]).scatter(1, topk_indices, 1)
+        node_grad = grad[target_nodes].abs()
+        _, topk_indices = node_grad.topk(self.topk_features, dim=1)
+        
+        delta = torch.zeros_like(perturbed_x)
+        delta[target_nodes] = self.step_size * grad[target_nodes].sign()
+        delta[target_nodes] *= torch.zeros_like(delta[target_nodes]).scatter(1, topk_indices, 1)
 
-            perturbed_x = (perturbed_x + delta).clamp(
-                min=self.original_x - self.eps,
-                max=self.original_x + self.eps
-            ).clamp(0, 1).detach()
+        perturbed_x = (perturbed_x + delta).clamp(0, 1).detach()
 
         attacked_data = self.data.clone()
         attacked_data.x = perturbed_x
