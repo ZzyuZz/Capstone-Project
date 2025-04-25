@@ -100,10 +100,8 @@ class SingleNodeAdversarialAttack:
         
         print(f"Sign Node Attack Evaluation ")
         print(f"Target Node {self.target_node}:")
-        print(f"Original prediction: {self.data.y[self.target_node].item()} "
-              f"(Accuracy: {output[self.target_node].max().exp().item():.4f})")
-        print(f"Attack prediction: {perturbed_pred[self.target_node].item()} "
-              f"(Accuracy: {output[self.target_node][perturbed_pred[self.target_node]].exp().item():.4f})")
+        print(f"Original prediction: {self.data.y[self.target_node].item()}")
+        print(f"Attack prediction: {perturbed_pred[self.target_node].item()}")
         
 dataset = Planetoid(root='./data/Cora', name='Cora')
 data = dataset[0] 
@@ -118,6 +116,7 @@ for epoch in range(1, 301):
 # Clear optimizer and start adversarial training
 optimizer = torch.optim.Adam(gnn_model.parameters(), lr=0.01, weight_decay=5e-4)
 adversarial_train(gnn_model, data)
+train()
 
 perturbed_graph = attack.attack()
 attack.evaluate_attack(perturbed_graph)
